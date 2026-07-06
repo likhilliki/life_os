@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Phantom Developer // Cognee Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --phantom-bg: #030712;
+            --phantom-card: #0a0a0f;
+            --phantom-border: #1f2937;
+            --phantom-accent: #10b981;
+        }
+        * { font-family: 'JetBrains Mono', monospace; }
+        body { background: linear-gradient(135deg, #030712 0%, #0f172a 50%, #030712 100%); }
+        .terminal-border { border: 1px solid #1f2937; box-shadow: 0 0 20px rgba(16, 185, 129, 0.1); }
+        .glow-text { text-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
+        .pulse-dot { animation: pulse-glow 2s infinite; }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px #10b981, 0 0 10px #10b981; }
+            50% { box-shadow: 0 0 10px #10b981, 0 0 20px #10b981, 0 0 30px #10b981; }
+        }
+        @keyframes scan-line {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        .scan-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #10b981, transparent);
+            animation: scan-line 8s linear infinite;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        .node-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(6, 78, 59, 0.1) 100%);
+            border-left: 3px solid #10b981;
+        }
+        .input-field {
+            background: #0a0a0f;
+            border: 1px solid #1f2937;
+            transition: all 0.2s ease;
+        }
+        .input-field:focus {
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+        .btn-secondary {
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            transition: all 0.2s ease;
+        }
+        .btn-secondary:hover {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: #10b981;
+        }
+        .memory-node { animation: node-appear 0.3s ease-out; }
+        @keyframes node-appear {
+            from { opacity: 0; transform: scale(0.8) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+    </style>
+</head>
+<body class="text-emerald-400 p-4 md:p-8 min-h-screen">
+    <div class="scan-line"></div>
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Dashboard Terminal Header -->
+        <header class="terminal-border p-5 bg-zinc-950/80 backdrop-blur-sm rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 pulse-dot"></span>
+                    <span class="glow-text">PHANTOM_DEV_AI</span>
+                    <span class="text-xs text-zinc-600 font-normal">v1.0.0</span>
+                </h1>
+                <p class="text-xs text-zinc-500 mt-1">Mining lost tribal knowledge and codebase history using Cognee Engine</p>
+            </div>
+            <div class="text-xs text-right space-y-1">
+                <div class="text-zinc-400">
+                    STATUS: <span class="text-emerald-400 font-bold" id="systemStatus">INITIALIZING...</span>
+                </div>
+                <div class="text-zinc-600">
+                    NODES: <span id="nodeCount" class="text-emerald-500">0</span> |
+                    AUTHORS: <span id="authorCount" class="text-emerald-500">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Grid Workspace -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Injection Form -->
+            <div class="lg:col-span-4 bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-6 rounded-xl space-y-5 shadow-xl">
+                <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                    <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Log Code Graveyard
+                    </h2>
+                    <span class="text-[10px] text-zinc-600 bg-zinc-900 px-2 py-1 rounded">INGEST MODULE</span>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-[11px] text-zinc-400 uppercase tracking-wide">Original Author</label>
+                    <input id="author" type="text" value="Dave (Ex-Dev)" class="w-full input-field rounded-lg p-3 text-sm text-zinc-200 outline-none" placeholder="e.g., Sarah (Left 2023)">
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-[11px] text-zinc-400 uppercase tracking-wide">Commit Message / Ticket</label>
+                    <input id="msg" type="text" class="w-full input-field rounded-lg p-3 text-sm text-zinc-200 outline-none" placeholder="e.g., Fix broken stripe checkout loop">
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-[11px] text-zinc-400 uppercase tracking-wide">Tribal Context / Unwritten Rules</label>
+                    <textarea id="context" rows="5" class="w-full input-field rounded-lg p-3 text-sm text-zinc-200 outline-none resize-none" placeholder="Paste Slack rants, architecture warnings, or exit interview text blocks here...&#10;&#10;e.g., 'Don't touch the payment callback - it has a race condition we bandaided in 2021. Dave knew why but never documented it.'"></textarea>
+                </div>
+
+                <div class="space-y-3 pt-2">
+                    <button onclick="submitKnowledge()" class="w-full btn-primary text-zinc-950 font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        EXECUTE .remember() INGEST
+                    </button>
+                    <button onclick="optimizeGraph()" class="w-full btn-secondary text-emerald-400 font-bold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        BUILD KNOWLEDGE GRAPH (.improve)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interrogation Console -->
+            <div class="lg:col-span-8 space-y-6">
+                <!-- Query Box -->
+                <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl space-y-4">
+                    <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Interrogate Legacy History
+                    </h2>
+                    <div class="flex flex-col md:flex-row gap-3">
+                        <input id="queryText" type="text" class="flex-1 input-field rounded-lg p-3 text-sm text-zinc-200 outline-none" placeholder="e.g., Why did we bypass the validation system? Who wrote the payment hack?">
+                        <button onclick="runBlameAnalysis()" class="btn-primary text-zinc-950 font-bold px-6 py-3 rounded-lg text-sm whitespace-nowrap flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.3.058.644.22.644.22"/>
+                            </svg>
+                            RECALL TRIBAL LOGS
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Memory Output Terminal -->
+                    <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl min-h-[320px] flex flex-col">
+                        <div class="border-b border-zinc-800 pb-2 flex justify-between items-center">
+                            <span class="text-xs text-zinc-500 uppercase tracking-wide">Memory Output Stream</span>
+                            <button onclick="clearTerminal()" class="text-[10px] text-zinc-600 hover:text-emerald-400 transition">CLEAR</button>
+                        </div>
+                        <div id="terminalStream" class="mt-4 flex-1 space-y-3 text-xs text-zinc-400 overflow-y-auto max-h-[240px]">
+                            <div class="text-center text-zinc-600 italic py-8">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
+                                // Standby. Feed historical text or run blame investigations.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Graph Preview -->
+                    <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl min-h-[320px] flex flex-col">
+                        <div class="border-b border-zinc-800 pb-2 flex justify-between items-center">
+                            <span class="text-xs text-zinc-500 uppercase tracking-wide">Knowledge Graph Preview</span>
+                            <button onclick="refreshGraph()" class="text-[10px] text-zinc-600 hover:text-emerald-400 transition">REFRESH</button>
+                        </div>
+                        <div id="graphPreview" class="mt-4 flex-1 relative overflow-hidden">
+                            <div class="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs">
+                                <div class="text-center">
+                                    <svg class="w-16 h-16 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                    </svg>
+                                    <span class="text-zinc-600">Graph will render after ingest</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Memory Log -->
+                <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl">
+                    <div class="border-b border-zinc-800 pb-2 mb-4 flex justify-between items-center">
+                        <span class="text-xs text-zinc-500 uppercase tracking-wide">Session Memory Log</span>
+                        <span id="memoryLogCount" class="text-[10px] text-zinc-600 bg-zinc-900 px-2 py-1 rounded">0 ENTRIES</span>
+                    </div>
+                    <div id="memoryLog" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[200px] overflow-y-auto">
+                        <div class="text-center text-zinc-600 text-xs italic col-span-full py-4">No memories logged in this session</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center text-xs text-zinc-600 py-4">
+            <span>BUILT WITH COGNEE 1.0 ENGINE</span>
+            <span class="mx-2">|</span>
+            <span>PHANTOM DEV AI</span>
+            <span class="mx-2">|</span>
+            <span class="text-emerald-600">HACKATHON 2025</span>
+        </footer>
+    </div>
+
+    <script>
+        const API = "http://localhost:8000/api/v1/phantom";
+        let sessionMemories = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkStatus();
+            refreshGraph();
+            setInterval(checkStatus, 30000);
+        });
+
+        async function checkStatus() {
+            try {
+                const res = await fetch(`${API.replace('/api/v1/phantom', '')}/health`);
+                const data = await res.json();
+                document.getElementById('systemStatus').textContent = 'ONLINE_MEM_LAYER';
+                document.getElementById('systemStatus').classList.add('text-emerald-400');
+                updateStats();
+            } catch (e) {
+                document.getElementById('systemStatus').textContent = 'OFFLINE';
+                document.getElementById('systemStatus').classList.add('text-red-500');
+            }
+        }
+
+        async function updateStats() {
+            try {
+                const res = await fetch(`${API}/stats`);
+                const data = await res.json();
+                document.getElementById('nodeCount').textContent = data.total_nodes;
+                document.getElementById('authorCount').textContent = data.unique_authors;
+            } catch (e) {
+                console.error('Stats fetch failed:', e);
+            }
+        }
+
+        async function submitKnowledge() {
+            const author = document.getElementById('author').value.trim();
+            const message = document.getElementById('msg').value.trim();
+            const context_stream = document.getElementById('context').value.trim();
+
+            if (!author || !message || !context_stream) {
+                showNotification('Error: All fields required for tribal knowledge ingest', 'error');
+                return;
+            }
+
+            appendTerminal(`> INGESTING tribal knowledge from: ${author}`, 'info');
+            appendTerminal(`> COMMIT: "${message.substring(0, 50)}..."`, 'dim');
+
+            try {
+                const res = await fetch(`${API}/ingest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ author, message, context_stream })
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    appendTerminal(`✓ NODE_REGISTERED: ${data.node_id}`, 'success');
+                    appendTerminal(`✓ TOTAL_NODES: ${data.total_nodes}`, 'dim');
+
+                    sessionMemories.unshift({ id: data.node_id, author, message, timestamp: new Date().toISOString() });
+                    renderMemoryLog();
+                    updateStats();
+                    refreshGraph();
+
+                    document.getElementById('msg').value = '';
+                    document.getElementById('context').value = '';
+                    showNotification(`Tribal knowledge mapped: ${data.node_id}`, 'success');
+                } else {
+                    throw new Error(data.detail || 'Unknown error');
+                }
+            } catch (e) {
+                appendTerminal(`✗ INGEST_FAILED: ${e.message}`, 'error');
+                showNotification('Failed to ingest memory. Backend may be offline.', 'error');
+            }
+        }
+
+        async function optimizeGraph() {
+            appendTerminal('> RUNNING .improve() on phantom_dev_graph...', 'info');
+            try {
+                const res = await fetch(`${API}/optimize`, { method: 'POST' });
+                const data = await res.json();
+                appendTerminal(`✓ GRAPH_OPTIMIZED: ${data.memory_nodes} nodes processed`, 'success');
+                appendTerminal(`✓ ${data.msg}`, 'dim');
+                showNotification('Knowledge graph semantic relations built', 'success');
+            } catch (e) {
+                appendTerminal(`✗ OPTIMIZE_FAILED: ${e.message}`, 'error');
+                showNotification('Graph optimization failed', 'error');
+            }
+        }
+
+        async function runBlameAnalysis() {
+            const question = document.getElementById('queryText').value.trim();
+            if (!question) {
+                showNotification('Enter a query to search tribal logs', 'error');
+                return;
+            }
+
+            appendTerminal(`> RECALL_QUERY: "${question}"`, 'info');
+
+            try {
+                const res = await fetch(`${API}/blame`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                const results = await res.json();
+
+                if (results.length === 0) {
+                    appendTerminal('✓ NO_MATCHES: Query returned empty result set', 'dim');
+                    showNotification('No tribal knowledge found for this query', 'info');
+                } else {
+                    appendTerminal(`✓ RETRIEVED: ${results.length} memory node(s)`, 'success');
+                    results.forEach((node, i) => {
+                        const preview = node.content.substring(0, 100) + '...';
+                        appendTerminal(`  [${i + 1}] ${node.id}: "${preview}"`, node.relevance === 'high' ? 'success' : 'dim');
+                        if (node.author) appendTerminal(`      AUTHOR: ${node.author}`, 'dim');
+                    });
+                    showNotification(`Found ${results.length} tribal knowledge node(s)`, 'success');
+                }
+            } catch (e) {
+                appendTerminal(`✗ RECALL_FAILED: ${e.message}`, 'error');
+                showNotification('Blame analysis failed', 'error');
+            }
+        }
+
+        async function refreshGraph() {
+            try {
+                const res = await fetch(`${API}/graph`);
+                const data = await res.json();
+                renderGraphPreview(data);
+                if (data.nodes && data.nodes.length > 0) {
+                    document.getElementById('nodeCount').textContent = data.nodes.length;
+                    if (data.stats) document.getElementById('authorCount').textContent = data.stats.unique_authors;
+                }
+            } catch (e) {
+                console.error('Graph refresh failed:', e);
+            }
+        }
+
+        function renderGraphPreview(graphData) {
+            const container = document.getElementById('graphPreview');
+            if (!graphData.nodes || graphData.nodes.length === 0) {
+                container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs"><div class="text-center"><svg class="w-16 h-16 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg><span class="text-zinc-600">Graph will render after ingest</span></div></div>`;
+                return;
+            }
+
+            const nodes = graphData.nodes.slice(0, 12);
+            let html = '';
+            nodes.forEach((node, i) => {
+                const col = i % 4;
+                const row = Math.floor(i / 4);
+                const x = 10 + col * 22;
+                const y = 15 + row * 30;
+                const label = node.data?.label || node.id;
+                const author = node.data?.author || 'Unknown';
+                const color = getNodeColor(author);
+                html += `<div class="absolute w-20 p-2 rounded-lg text-center cursor-pointer transition-transform hover:scale-105 memory-node" style="left: ${x}%; top: ${y}%; background: ${color}20; border: 1px solid ${color}50;" title="${author}: ${label}"><div class="text-[9px] text-zinc-400 truncate">${author.split(' ')[0]}</div><div class="text-[10px] text-emerald-400 truncate font-medium">${label.substring(0, 12)}...</div></div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function getNodeColor(author) {
+            const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899'];
+            const hash = author.split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0);
+            return colors[Math.abs(hash) % colors.length];
+        }
+
+        function renderMemoryLog() {
+            const container = document.getElementById('memoryLog');
+            if (sessionMemories.length === 0) {
+                container.innerHTML = `<div class="text-center text-zinc-600 text-xs italic col-span-full py-4">No memories logged in this session</div>`;
+                document.getElementById('memoryLogCount').textContent = '0 ENTRIES';
+                return;
+            }
+            document.getElementById('memoryLogCount').textContent = `${sessionMemories.length} ENTRIES`;
+            container.innerHTML = sessionMemories.slice(0, 9).map(mem => `<div class="node-card p-3 rounded-lg memory-node"><div class="text-[10px] text-zinc-500">${mem.id}</div><div class="text-[11px] text-emerald-400 font-medium truncate">${mem.message.substring(0, 30)}...</div><div class="text-[9px] text-zinc-600 mt-1">${mem.author}</div></div>`).join('');
+        }
+
+        function appendTerminal(text, type = 'dim') {
+            const terminal = document.getElementById('terminalStream');
+            if (terminal.querySelector('.italic')) terminal.innerHTML = '';
+            const colors = { success: 'text-emerald-400', error: 'text-red-400', info: 'text-blue-400', dim: 'text-zinc-500' };
+            const line = document.createElement('div');
+            line.className = `py-1 ${colors[type]}`;
+            line.innerHTML = text;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function clearTerminal() {
+            document.getElementById('terminalStream').innerHTML = `<div class="text-center text-zinc-600 italic py-8"><svg class="w-12 h-12 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>// Terminal cleared. Ready for new operations.</div>`;
+        }
+
+        function showNotification(message, type) {
+            const prefix = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+            console.log(`${prefix} ${message}`);
+        }
+    </script>
+</body>
+</html>
