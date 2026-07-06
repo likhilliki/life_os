@@ -3,351 +3,321 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Phantom Developer // Cognee Engine</title>
+    <title>AI Phantom Developer // Animated Knowledge Graph</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --phantom-bg: #030712;
-            --phantom-card: #0a0a0f;
-            --phantom-border: #1f2937;
-            --phantom-accent: #10b981;
-        }
         * { font-family: 'JetBrains Mono', monospace; }
-        body { background: linear-gradient(135deg, #030712 0%, #0f172a 50%, #030712 100%); }
-        .terminal-border { border: 1px solid #1f2937; box-shadow: 0 0 20px rgba(16, 185, 129, 0.1); }
+        body { background: #0a0a0f; margin: 0; overflow-x: hidden; }
+
+        .glow { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6)); }
         .glow-text { text-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
-        .pulse-dot { animation: pulse-glow 2s infinite; }
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 5px #10b981, 0 0 10px #10b981; }
-            50% { box-shadow: 0 0 10px #10b981, 0 0 20px #10b981, 0 0 30px #10b981; }
+
+        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+        @keyframes dash { to { stroke-dashoffset: -20; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        @keyframes ripple { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+        @keyframes nodeGlow { 0%, 100% { box-shadow: 0 0 5px currentColor; } 50% { box-shadow: 0 0 20px currentColor; } }
+
+        .animate-pulse-slow { animation: pulse 3s ease-in-out infinite; }
+        .animate-float { animation: float 4s ease-in-out infinite; }
+        .animate-dash { animation: dash 0.5s linear infinite; }
+        .animate-node-glow { animation: nodeGlow 2s ease-in-out infinite; }
+
+        .edge-animated { stroke-dasharray: 5, 5; animation: dash 1s linear infinite; }
+
+        .graph-node {
+            position: absolute;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            animation: float 4s ease-in-out infinite;
         }
-        @keyframes scan-line {
-            0% { transform: translateY(-100%); }
-            100% { transform: translateY(100vh); }
-        }
-        .scan-line {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #10b981, transparent);
-            animation: scan-line 8s linear infinite;
-            pointer-events: none;
-            opacity: 0.3;
-        }
-        .node-card {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(6, 78, 59, 0.1) 100%);
-            border-left: 3px solid #10b981;
-        }
+        .graph-node:hover { transform: scale(1.1); z-index: 100; }
+
         .input-field {
-            background: #0a0a0f;
-            border: 1px solid #1f2937;
-            transition: all 0.2s ease;
+            background: #111;
+            border: 1px solid #333;
+            transition: all 0.2s;
         }
         .input-field:focus {
             border-color: #10b981;
             box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
         }
+
         .btn-primary {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
-            transition: all 0.2s ease;
+            transition: all 0.2s;
         }
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4); }
+
+        .terminal-output {
+            background: linear-gradient(180deg, #0a0a0f 0%, #111 100%);
+            border: 1px solid #1f2937;
         }
-        .btn-secondary {
-            background: rgba(16, 185, 129, 0.05);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            transition: all 0.2s ease;
+
+        .status-online { color: #10b981; text-shadow: 0 0 5px #10b981; }
+        .status-offline { color: #ef4444; }
+
+        .card {
+            background: rgba(17, 17, 27, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid #1f2937;
         }
-        .btn-secondary:hover {
-            background: rgba(16, 185, 129, 0.1);
-            border-color: #10b981;
+
+        .ai-response {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 78, 59, 0.2) 100%);
+            border-left: 3px solid #10b981;
         }
-        .memory-node { animation: node-appear 0.3s ease-out; }
-        @keyframes node-appear {
-            from { opacity: 0; transform: scale(0.8) translateY(10px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+
+        #graphCanvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+        .memory-card {
+            background: linear-gradient(135deg, rgba(17, 17, 27, 0.9) 0%, rgba(10, 10, 15, 0.95) 100%);
+            border: 1px solid #333;
+            transition: all 0.3s;
         }
+        .memory-card:hover { border-color: #10b981; transform: translateY(-2px); }
     </style>
 </head>
-<body class="text-emerald-400 p-4 md:p-8 min-h-screen">
-    <div class="scan-line"></div>
-
-    <div class="max-w-7xl mx-auto space-y-6">
-        <!-- Dashboard Terminal Header -->
-        <header class="terminal-border p-5 bg-zinc-950/80 backdrop-blur-sm rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl">
-            <div>
-                <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-                    <span class="w-3 h-3 rounded-full bg-emerald-500 pulse-dot"></span>
-                    <span class="glow-text">PHANTOM_DEV_AI</span>
-                    <span class="text-xs text-zinc-600 font-normal">v1.0.0</span>
-                </h1>
-                <p class="text-xs text-zinc-500 mt-1">Mining lost tribal knowledge and codebase history using Cognee Engine</p>
-            </div>
-            <div class="text-xs text-right space-y-1">
-                <div class="text-zinc-400">
-                    STATUS: <span class="text-emerald-400 font-bold" id="systemStatus">INITIALIZING...</span>
-                </div>
-                <div class="text-zinc-600">
-                    NODES: <span id="nodeCount" class="text-emerald-500">0</span> |
-                    AUTHORS: <span id="authorCount" class="text-emerald-500">0</span>
+<body class="text-emerald-400 min-h-screen">
+    <!-- Header -->
+    <header class="card p-4 m-4 rounded-xl">
+        <div class="flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse-slow"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-white glow-text">PHANTOM_DEV_AI</h1>
+                    <p class="text-xs text-zinc-500">Animated Knowledge Graph with Cognee AI</p>
                 </div>
             </div>
-        </header>
+            <div class="text-right text-xs">
+                <div>STATUS: <span id="status" class="status-offline">OFFLINE</span></div>
+                <div class="text-zinc-600">NODES: <span id="nodeCount">0</span> | EDGES: <span id="edgeCount">0</span></div>
+            </div>
+        </div>
+    </header>
 
-        <!-- Grid Workspace -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Injection Form -->
-            <div class="lg:col-span-4 bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-6 rounded-xl space-y-5 shadow-xl">
-                <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
-                    <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        Log Code Graveyard
-                    </h2>
-                    <span class="text-[10px] text-zinc-600 bg-zinc-900 px-2 py-1 rounded">INGEST MODULE</span>
+    <div class="grid grid-cols-12 gap-4 p-4">
+        <!-- Left Panel: Memory Input -->
+        <div class="col-span-3 space-y-4">
+            <div class="card p-4 rounded-xl space-y-4">
+                <h2 class="text-sm font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-2">
+                    Add Memory Node
+                </h2>
+
+                <div class="space-y-2">
+                    <label class="text-xs text-zinc-400 uppercase">Author</label>
+                    <input id="author" type="text" value="Dave (ex-CTO)" class="w-full input-field rounded p-2 text-sm text-zinc-200 outline-none">
                 </div>
 
-                <div class="space-y-1.5">
-                    <label class="text-[11px] text-zinc-400 uppercase tracking-wide">Original Author</label>
-                    <input id="author" type="text" value="Dave (Ex-Dev)" class="w-full input-field rounded-lg p-3 text-sm text-zinc-200 outline-none" placeholder="e.g., Sarah (Left 2023)">
+                <div class="space-y-2">
+                    <label class="text-xs text-zinc-400 uppercase">Commit/Message</label>
+                    <input id="message" type="text" class="w-full input-field rounded p-2 text-sm text-zinc-200 outline-none" placeholder="What was done?">
                 </div>
 
-                <div class="space-y-1.5">
-                    <label class="text-[11px] text-zinc-400 uppercase tracking-wide">Commit Message / Ticket</label>
-                    <input id="msg" type="text" class="w-full input-field rounded-lg p-3 text-sm text-zinc-200 outline-none" placeholder="e.g., Fix broken stripe checkout loop">
+                <div class="space-y-2">
+                    <label class="text-xs text-zinc-400 uppercase">Tribal Context</label>
+                    <textarea id="context" rows="4" class="w-full input-field rounded p-2 text-sm text-zinc-200 outline-none resize-none" placeholder="Why? Hidden knowledge? Warnings?"></textarea>
                 </div>
 
-                <div class="space-y-1.5">
-                    <label class="text-[11px] text-zinc-400 uppercase tracking-wide">Tribal Context / Unwritten Rules</label>
-                    <textarea id="context" rows="5" class="w-full input-field rounded-lg p-3 text-sm text-zinc-200 outline-none resize-none" placeholder="Paste Slack rants, architecture warnings, or exit interview text blocks here...&#10;&#10;e.g., 'Don't touch the payment callback - it has a race condition we bandaided in 2021. Dave knew why but never documented it.'"></textarea>
-                </div>
+                <button onclick="addMemory()" class="w-full btn-primary text-zinc-950 font-bold py-2 rounded text-sm">
+                    INGEST MEMORY
+                </button>
 
-                <div class="space-y-3 pt-2">
-                    <button onclick="submitKnowledge()" class="w-full btn-primary text-zinc-950 font-bold py-3 rounded-lg text-sm flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                        </svg>
-                        EXECUTE .remember() INGEST
-                    </button>
-                    <button onclick="optimizeGraph()" class="w-full btn-secondary text-emerald-400 font-bold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                        </svg>
-                        BUILD KNOWLEDGE GRAPH (.improve)
-                    </button>
-                </div>
+                <div id="uploadStatus" class="text-xs text-center hidden"></div>
             </div>
 
-            <!-- Interrogation Console -->
-            <div class="lg:col-span-8 space-y-6">
-                <!-- Query Box -->
-                <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl space-y-4">
-                    <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        Interrogate Legacy History
-                    </h2>
-                    <div class="flex flex-col md:flex-row gap-3">
-                        <input id="queryText" type="text" class="flex-1 input-field rounded-lg p-3 text-sm text-zinc-200 outline-none" placeholder="e.g., Why did we bypass the validation system? Who wrote the payment hack?">
-                        <button onclick="runBlameAnalysis()" class="btn-primary text-zinc-950 font-bold px-6 py-3 rounded-lg text-sm whitespace-nowrap flex items-center justify-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.3.058.644.22.644.22"/>
-                            </svg>
-                            RECALL TRIBAL LOGS
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Results Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Memory Output Terminal -->
-                    <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl min-h-[320px] flex flex-col">
-                        <div class="border-b border-zinc-800 pb-2 flex justify-between items-center">
-                            <span class="text-xs text-zinc-500 uppercase tracking-wide">Memory Output Stream</span>
-                            <button onclick="clearTerminal()" class="text-[10px] text-zinc-600 hover:text-emerald-400 transition">CLEAR</button>
-                        </div>
-                        <div id="terminalStream" class="mt-4 flex-1 space-y-3 text-xs text-zinc-400 overflow-y-auto max-h-[240px]">
-                            <div class="text-center text-zinc-600 italic py-8">
-                                <svg class="w-12 h-12 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                </svg>
-                                // Standby. Feed historical text or run blame investigations.
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Graph Preview -->
-                    <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl min-h-[320px] flex flex-col">
-                        <div class="border-b border-zinc-800 pb-2 flex justify-between items-center">
-                            <span class="text-xs text-zinc-500 uppercase tracking-wide">Knowledge Graph Preview</span>
-                            <button onclick="refreshGraph()" class="text-[10px] text-zinc-600 hover:text-emerald-400 transition">REFRESH</button>
-                        </div>
-                        <div id="graphPreview" class="mt-4 flex-1 relative overflow-hidden">
-                            <div class="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs">
-                                <div class="text-center">
-                                    <svg class="w-16 h-16 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                    </svg>
-                                    <span class="text-zinc-600">Graph will render after ingest</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Session Memory Log -->
-                <div class="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800 p-5 rounded-xl shadow-xl">
-                    <div class="border-b border-zinc-800 pb-2 mb-4 flex justify-between items-center">
-                        <span class="text-xs text-zinc-500 uppercase tracking-wide">Session Memory Log</span>
-                        <span id="memoryLogCount" class="text-[10px] text-zinc-600 bg-zinc-900 px-2 py-1 rounded">0 ENTRIES</span>
-                    </div>
-                    <div id="memoryLog" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[200px] overflow-y-auto">
-                        <div class="text-center text-zinc-600 text-xs italic col-span-full py-4">No memories logged in this session</div>
-                    </div>
+            <!-- Quick Stats -->
+            <div class="card p-4 rounded-xl">
+                <h3 class="text-xs text-zinc-500 uppercase mb-3">Graph Stats</h3>
+                <div id="statsPanel" class="space-y-2 text-xs">
+                    <div class="flex justify-between"><span class="text-zinc-500">Memories:</span><span id="statMemories">0</span></div>
+                    <div class="flex justify-between"><span class="text-zinc-500">Connections:</span><span id="statConnections">0</span></div>
+                    <div class="flex justify-between"><span class="text-zinc-500">Authors:</span><span id="statAuthors">0</span></div>
                 </div>
             </div>
         </div>
 
-        <!-- Footer -->
-        <footer class="text-center text-xs text-zinc-600 py-4">
-            <span>BUILT WITH COGNEE 1.0 ENGINE</span>
-            <span class="mx-2">|</span>
-            <span>PHANTOM DEV AI</span>
-            <span class="mx-2">|</span>
-            <span class="text-emerald-600">HACKATHON 2025</span>
-        </footer>
+        <!-- Center: Animated Graph -->
+        <div class="col-span-6">
+            <div class="card rounded-xl overflow-hidden" style="height: 500px;">
+                <div class="p-3 border-b border-zinc-800 flex justify-between items-center">
+                    <span class="text-xs text-zinc-500 uppercase">Animated Knowledge Graph</span>
+                    <button onclick="refreshGraph()" class="text-xs text-emerald-400 hover:text-emerald-300">REFRESH</button>
+                </div>
+                <div id="graphContainer" class="relative w-full h-full" style="height: 450px;">
+                    <canvas id="graphCanvas"></canvas>
+                    <div id="nodesContainer"></div>
+                </div>
+            </div>
+
+            <!-- AI Query Panel -->
+            <div class="card p-4 rounded-xl mt-4">
+                <h3 class="text-xs text-zinc-500 uppercase mb-3">Query with AI</h3>
+                <div class="flex gap-2">
+                    <input id="queryInput" type="text" class="flex-1 input-field rounded p-2 text-sm text-zinc-200 outline-none" placeholder="Ask about tribal knowledge...">
+                    <button onclick="queryAI()" class="btn-primary px-4 py-2 rounded text-sm text-zinc-950 font-bold">ASK AI</button>
+                </div>
+                <div id="aiResponse" class="mt-4 hidden">
+                    <div class="ai-response p-3 rounded text-sm text-emerald-300"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Terminal & Results -->
+        <div class="col-span-3 space-y-4">
+            <!-- Terminal Output -->
+            <div class="card rounded-xl overflow-hidden" style="height: 250px;">
+                <div class="p-3 border-b border-zinc-800 text-xs text-zinc-500 uppercase">Terminal Output</div>
+                <div id="terminal" class="p-3 overflow-y-auto text-xs space-y-1" style="height: 200px;">
+                    <div class="text-zinc-600">// System initializing...</div>
+                </div>
+            </div>
+
+            <!-- Memory List -->
+            <div class="card rounded-xl overflow-hidden" style="height: 250px;">
+                <div class="p-3 border-b border-zinc-800 text-xs text-zinc-500 uppercase">Recent Memories</div>
+                <div id="memoryList" class="p-3 overflow-y-auto space-y-2" style="height: 200px;">
+                    <div class="text-zinc-600 text-xs text-center py-4">No memories yet</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        const API = "http://localhost:8000/api/v1/phantom";
-        let sessionMemories = [];
+        const API = 'http://localhost:8000';
+        let graphData = { nodes: [], edges: [] };
+        let canvas, ctx;
+        let animationFrame;
 
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            initCanvas();
             checkStatus();
             refreshGraph();
-            setInterval(checkStatus, 30000);
+            setInterval(checkStatus, 10000);
         });
+
+        function initCanvas() {
+            canvas = document.getElementById('graphCanvas');
+            const container = document.getElementById('graphContainer');
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+            ctx = canvas.getContext('2d');
+            animateEdges();
+        }
+
+        // Animated edge drawing
+        function animateEdges() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw animated edges
+            graphData.edges.forEach(edge => {
+                const source = graphData.nodes.find(n => n.id === edge.source);
+                const target = graphData.nodes.find(n => n.id === edge.target);
+                if (source && target) {
+                    drawAnimatedEdge(source, target, edge);
+                }
+            });
+
+            animationFrame = requestAnimationFrame(animateEdges);
+        }
+
+        function drawAnimatedEdge(source, target, edge) {
+            const time = Date.now() / 1000;
+            const offset = (time * 50) % 20;
+
+            ctx.beginPath();
+            ctx.moveTo(source.x, source.y);
+            ctx.lineTo(target.x, target.y);
+
+            // Edge color based on type
+            const colors = {
+                'same_author': '#10b981',
+                'related_topic': '#3b82f6',
+                'semantic': '#8b5cf6'
+            };
+            ctx.strokeStyle = colors[edge.label] || '#333';
+            ctx.lineWidth = 1 + (edge.strength || 0.5);
+            ctx.setLineDash([5, 5]);
+            ctx.lineDashOffset = -offset;
+            ctx.stroke();
+
+            // Draw moving particle
+            const progress = (time * 0.5) % 1;
+            const px = source.x + (target.x - source.x) * progress;
+            const py = source.y + (target.y - source.y) * progress;
+
+            ctx.beginPath();
+            ctx.arc(px, py, 3, 0, Math.PI * 2);
+            ctx.fillStyle = colors[edge.label] || '#10b981';
+            ctx.fill();
+            ctx.setLineDash([]);
+        }
 
         async function checkStatus() {
             try {
-                const res = await fetch(`${API.replace('/api/v1/phantom', '')}/health`);
+                const res = await fetch(`${API}/health`);
                 const data = await res.json();
-                document.getElementById('systemStatus').textContent = 'ONLINE_MEM_LAYER';
-                document.getElementById('systemStatus').classList.add('text-emerald-400');
-                updateStats();
+                document.getElementById('status').textContent = 'ONLINE';
+                document.getElementById('status').className = 'status-online';
+                updateStats(data);
             } catch (e) {
-                document.getElementById('systemStatus').textContent = 'OFFLINE';
-                document.getElementById('systemStatus').classList.add('text-red-500');
+                document.getElementById('status').textContent = 'OFFLINE';
+                document.getElementById('status').className = 'status-offline';
+                logTerminal('Backend connection failed', 'error');
             }
         }
 
-        async function updateStats() {
-            try {
-                const res = await fetch(`${API}/stats`);
-                const data = await res.json();
-                document.getElementById('nodeCount').textContent = data.total_nodes;
-                document.getElementById('authorCount').textContent = data.unique_authors;
-            } catch (e) {
-                console.error('Stats fetch failed:', e);
-            }
+        function updateStats(data) {
+            document.getElementById('nodeCount').textContent = data.memories || graphData.nodes.length;
+            document.getElementById('edgeCount').textContent = data.connections || graphData.edges.length;
+            document.getElementById('statMemories').textContent = data.memories || graphData.nodes.length;
+            document.getElementById('statConnections').textContent = data.connections || graphData.edges.length;
+            document.getElementById('statAuthors').textContent = data.unique_authors || 0;
         }
 
-        async function submitKnowledge() {
+        async function addMemory() {
             const author = document.getElementById('author').value.trim();
-            const message = document.getElementById('msg').value.trim();
-            const context_stream = document.getElementById('context').value.trim();
+            const message = document.getElementById('message').value.trim();
+            const context = document.getElementById('context').value.trim();
 
-            if (!author || !message || !context_stream) {
-                showNotification('Error: All fields required for tribal knowledge ingest', 'error');
+            if (!author || !message) {
+                showUploadStatus('Author and message required', 'error');
                 return;
             }
 
-            appendTerminal(`> INGESTING tribal knowledge from: ${author}`, 'info');
-            appendTerminal(`> COMMIT: "${message.substring(0, 50)}..."`, 'dim');
+            logTerminal(`Ingesting memory from ${author}...`, 'info');
+            showUploadStatus('Uploading...', 'loading');
 
             try {
                 const res = await fetch(`${API}/ingest`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ author, message, context_stream })
+                    body: JSON.stringify({ author, message, context_stream: context })
                 });
                 const data = await res.json();
 
                 if (data.status === 'success') {
-                    appendTerminal(`✓ NODE_REGISTERED: ${data.node_id}`, 'success');
-                    appendTerminal(`✓ TOTAL_NODES: ${data.total_nodes}`, 'dim');
+                    logTerminal(`Memory added: ${data.node_id}`, 'success');
+                    logTerminal(`Connections created: ${data.connections}`, 'info');
+                    showUploadStatus('Memory ingested!', 'success');
 
-                    sessionMemories.unshift({ id: data.node_id, author, message, timestamp: new Date().toISOString() });
-                    renderMemoryLog();
-                    updateStats();
-                    refreshGraph();
-
-                    document.getElementById('msg').value = '';
+                    // Clear inputs
+                    document.getElementById('message').value = '';
                     document.getElementById('context').value = '';
-                    showNotification(`Tribal knowledge mapped: ${data.node_id}`, 'success');
+
+                    // Refresh graph
+                    refreshGraph();
                 } else {
-                    throw new Error(data.detail || 'Unknown error');
+                    throw new Error(data.detail || 'Upload failed');
                 }
             } catch (e) {
-                appendTerminal(`✗ INGEST_FAILED: ${e.message}`, 'error');
-                showNotification('Failed to ingest memory. Backend may be offline.', 'error');
-            }
-        }
-
-        async function optimizeGraph() {
-            appendTerminal('> RUNNING .improve() on phantom_dev_graph...', 'info');
-            try {
-                const res = await fetch(`${API}/optimize`, { method: 'POST' });
-                const data = await res.json();
-                appendTerminal(`✓ GRAPH_OPTIMIZED: ${data.memory_nodes} nodes processed`, 'success');
-                appendTerminal(`✓ ${data.msg}`, 'dim');
-                showNotification('Knowledge graph semantic relations built', 'success');
-            } catch (e) {
-                appendTerminal(`✗ OPTIMIZE_FAILED: ${e.message}`, 'error');
-                showNotification('Graph optimization failed', 'error');
-            }
-        }
-
-        async function runBlameAnalysis() {
-            const question = document.getElementById('queryText').value.trim();
-            if (!question) {
-                showNotification('Enter a query to search tribal logs', 'error');
-                return;
-            }
-
-            appendTerminal(`> RECALL_QUERY: "${question}"`, 'info');
-
-            try {
-                const res = await fetch(`${API}/blame`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question })
-                });
-                const results = await res.json();
-
-                if (results.length === 0) {
-                    appendTerminal('✓ NO_MATCHES: Query returned empty result set', 'dim');
-                    showNotification('No tribal knowledge found for this query', 'info');
-                } else {
-                    appendTerminal(`✓ RETRIEVED: ${results.length} memory node(s)`, 'success');
-                    results.forEach((node, i) => {
-                        const preview = node.content.substring(0, 100) + '...';
-                        appendTerminal(`  [${i + 1}] ${node.id}: "${preview}"`, node.relevance === 'high' ? 'success' : 'dim');
-                        if (node.author) appendTerminal(`      AUTHOR: ${node.author}`, 'dim');
-                    });
-                    showNotification(`Found ${results.length} tribal knowledge node(s)`, 'success');
-                }
-            } catch (e) {
-                appendTerminal(`✗ RECALL_FAILED: ${e.message}`, 'error');
-                showNotification('Blame analysis failed', 'error');
+                logTerminal(`Error: ${e.message}`, 'error');
+                showUploadStatus('Upload failed', 'error');
             }
         }
 
@@ -355,74 +325,135 @@
             try {
                 const res = await fetch(`${API}/graph`);
                 const data = await res.json();
-                renderGraphPreview(data);
-                if (data.nodes && data.nodes.length > 0) {
-                    document.getElementById('nodeCount').textContent = data.nodes.length;
-                    if (data.stats) document.getElementById('authorCount').textContent = data.stats.unique_authors;
+                graphData = data;
+                renderNodes();
+                updateStats({ memories: data.nodes.length, connections: data.edges.length });
+                updateMemoryList(data.nodes);
+            } catch (e) {
+                logTerminal('Failed to load graph', 'error');
+            }
+        }
+
+        function renderNodes() {
+            const container = document.getElementById('nodesContainer');
+            container.innerHTML = '';
+
+            graphData.nodes.forEach((node, i) => {
+                const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899'];
+                const color = colors[i % colors.length];
+
+                const div = document.createElement('div');
+                div.className = 'graph-node';
+                div.style.left = `${node.x}px`;
+                div.style.top = `${node.y}px`;
+                div.style.background = `${color}20`;
+                div.style.borderLeft = `3px solid ${color}`;
+                div.style.color = color;
+                div.style.animationDelay = `${i * 0.1}s`;
+                div.innerHTML = `
+                    <div class="text-[10px] opacity-70">${node.author}</div>
+                    <div class="text-xs">${node.label}</div>
+                `;
+
+                div.onclick = () => showNodeDetails(node);
+                container.appendChild(div);
+            });
+        }
+
+        function showNodeDetails(node) {
+            logTerminal(`NODE: ${node.id}`, 'info');
+            logTerminal(`  Author: ${node.author}`, 'dim');
+            logTerminal(`  Message: ${node.fullLabel}`, 'dim');
+            logTerminal(`  Connections: ${node.connections?.length || 0}`, 'dim');
+        }
+
+        function updateMemoryList(nodes) {
+            const list = document.getElementById('memoryList');
+            if (!nodes.length) {
+                list.innerHTML = '<div class="text-zinc-600 text-xs text-center py-4">No memories yet</div>';
+                return;
+            }
+
+            list.innerHTML = nodes.slice(0, 10).map(n => `
+                <div class="memory-card p-2 rounded text-xs cursor-pointer" onclick="showNodeDetails(${JSON.stringify(n).replace(/"/g, '&quot;')})">
+                    <div class="text-zinc-500">${n.id}</div>
+                    <div class="text-emerald-400 truncate">${n.label}</div>
+                    <div class="text-zinc-600 text-[10px]">${n.author}</div>
+                </div>
+            `).join('');
+        }
+
+        async function queryAI() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) return;
+
+            logTerminal(`Query: "${query}"`, 'info');
+            const responseDiv = document.getElementById('aiResponse');
+            responseDiv.classList.remove('hidden');
+            responseDiv.querySelector('div').innerHTML = '<span class="animate-pulse">Processing...</span>';
+
+            try {
+                const res = await fetch(`${API}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: query, use_ai: true })
+                });
+                const data = await res.json();
+
+                if (data.ai_answer) {
+                    responseDiv.querySelector('div').innerHTML = `
+                        <div class="font-bold mb-2">AI Response:</div>
+                        <div>${data.ai_answer}</div>
+                        <div class="mt-2 text-xs text-zinc-500">Found ${data.total_found} related memories</div>
+                    `;
+                    logTerminal('AI response received', 'success');
+                } else {
+                    responseDiv.querySelector('div').innerHTML = `No relevant memories found for "${query}"`;
+                    logTerminal('No results found', 'dim');
                 }
             } catch (e) {
-                console.error('Graph refresh failed:', e);
+                responseDiv.querySelector('div').innerHTML = 'Query failed. Backend may be offline.';
+                logTerminal('Query error', 'error');
             }
         }
 
-        function renderGraphPreview(graphData) {
-            const container = document.getElementById('graphPreview');
-            if (!graphData.nodes || graphData.nodes.length === 0) {
-                container.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs"><div class="text-center"><svg class="w-16 h-16 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg><span class="text-zinc-600">Graph will render after ingest</span></div></div>`;
-                return;
-            }
+        function logTerminal(message, type = 'dim') {
+            const terminal = document.getElementById('terminal');
+            const colors = {
+                success: 'text-emerald-400',
+                error: 'text-red-400',
+                info: 'text-blue-400',
+                dim: 'text-zinc-500'
+            };
 
-            const nodes = graphData.nodes.slice(0, 12);
-            let html = '';
-            nodes.forEach((node, i) => {
-                const col = i % 4;
-                const row = Math.floor(i / 4);
-                const x = 10 + col * 22;
-                const y = 15 + row * 30;
-                const label = node.data?.label || node.id;
-                const author = node.data?.author || 'Unknown';
-                const color = getNodeColor(author);
-                html += `<div class="absolute w-20 p-2 rounded-lg text-center cursor-pointer transition-transform hover:scale-105 memory-node" style="left: ${x}%; top: ${y}%; background: ${color}20; border: 1px solid ${color}50;" title="${author}: ${label}"><div class="text-[9px] text-zinc-400 truncate">${author.split(' ')[0]}</div><div class="text-[10px] text-emerald-400 truncate font-medium">${label.substring(0, 12)}...</div></div>`;
-            });
-            container.innerHTML = html;
-        }
-
-        function getNodeColor(author) {
-            const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899'];
-            const hash = author.split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0);
-            return colors[Math.abs(hash) % colors.length];
-        }
-
-        function renderMemoryLog() {
-            const container = document.getElementById('memoryLog');
-            if (sessionMemories.length === 0) {
-                container.innerHTML = `<div class="text-center text-zinc-600 text-xs italic col-span-full py-4">No memories logged in this session</div>`;
-                document.getElementById('memoryLogCount').textContent = '0 ENTRIES';
-                return;
-            }
-            document.getElementById('memoryLogCount').textContent = `${sessionMemories.length} ENTRIES`;
-            container.innerHTML = sessionMemories.slice(0, 9).map(mem => `<div class="node-card p-3 rounded-lg memory-node"><div class="text-[10px] text-zinc-500">${mem.id}</div><div class="text-[11px] text-emerald-400 font-medium truncate">${mem.message.substring(0, 30)}...</div><div class="text-[9px] text-zinc-600 mt-1">${mem.author}</div></div>`).join('');
-        }
-
-        function appendTerminal(text, type = 'dim') {
-            const terminal = document.getElementById('terminalStream');
-            if (terminal.querySelector('.italic')) terminal.innerHTML = '';
-            const colors = { success: 'text-emerald-400', error: 'text-red-400', info: 'text-blue-400', dim: 'text-zinc-500' };
             const line = document.createElement('div');
-            line.className = `py-1 ${colors[type]}`;
-            line.innerHTML = text;
+            line.className = colors[type];
+            line.textContent = `> ${message}`;
             terminal.appendChild(line);
             terminal.scrollTop = terminal.scrollHeight;
         }
 
-        function clearTerminal() {
-            document.getElementById('terminalStream').innerHTML = `<div class="text-center text-zinc-600 italic py-8"><svg class="w-12 h-12 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>// Terminal cleared. Ready for new operations.</div>`;
+        function showUploadStatus(message, type) {
+            const status = document.getElementById('uploadStatus');
+            status.classList.remove('hidden', 'text-emerald-400', 'text-red-400');
+            status.classList.add(type === 'success' ? 'text-emerald-400' : 'text-red-400');
+            status.textContent = message;
+            setTimeout(() => status.classList.add('hidden'), 3000);
         }
 
-        function showNotification(message, type) {
-            const prefix = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
-            console.log(`${prefix} ${message}`);
-        }
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('graphContainer');
+            if (canvas && container) {
+                canvas.width = container.offsetWidth;
+                canvas.height = container.offsetHeight;
+            }
+        });
+
+        // Enter key for query
+        document.getElementById('queryInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') queryAI();
+        });
     </script>
 </body>
 </html>

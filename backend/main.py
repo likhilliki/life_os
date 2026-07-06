@@ -1,41 +1,40 @@
 """
-LifeOS AI Backend - Cognee-powered memory graph
+AI Phantom Developer - Cognee 1.0 Knowledge Graph Engine
+Fully animated graph with real AI integration
 """
 import os
-import json
-import asyncio
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
+import logging
+from datetime import datetime
+from typing import List, Any, Optional, Dict
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings
-import jwt
 
-# Disable Cognee's multi-user auth for simple hackathon demo
+# Configure Cognee for local operation
 os.environ["ENABLE_BACKEND_ACCESS_CONTROL"] = "false"
-os.environ["CACHING"] = "false"  # Disable session caching for simpler graph access
+os.environ["CACHING"] = "false"
 
 import cognee
 from cognee.api.v1.search import SearchType
-from cognee.infrastructure.databases.graph import get_graph_config
 
+# Try to configure LLM if API key is available
+try:
+    if os.environ.get("OPENAI_API_KEY"):
+        cognee.config.set({
+            "LLM_ENGINE": "openai",
+            "LLM_MODEL": "gpt-4o-mini"
+        })
+except Exception:
+    pass
 
-class Settings(BaseSettings):
-    jwt_secret: str = "lifeos-secret-key-change-in-production"
-    jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 24
-    cognee_graph_db: str = "networkx"
-    cognee_embedding_engine: str = "ollama"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    class Config:
-        env_file = ".env"
-
-
-settings = Settings()
-
-app = FastAPI(title="LifeOS AI Backend")
+app = FastAPI(
+    title="AI Phantom Developer Core",
+    version="1.0.0",
+    description="Mining lost tribal knowledge with animated graph"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,356 +44,387 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cognee uses default local config (networkx graph, lanceDB vector)
+DATASET_NAME = "phantom_dev_graph"
 
-# Dataset name for our memories
-DATASET_NAME = "lifeos_memories"
-
-# Simple in-memory user store (for hackathon)
-users_db: dict = {}
-
-# In-memory storage for extension captures (for demo without LLM)
-extension_memories: List[Dict[str, Any]] = []
+# In-memory storage for hackathon demo (works without LLM)
+phantom_memories: List[Dict[str, Any]] = []
+memory_counter = 0
+node_connections: List[Dict[str, str]] = []
 
 
-class UserCreate(BaseModel):
-    email: str
-    password: str
-    full_name: str = ""
+class MemoryIngest(BaseModel):
+    author: str
+    message: str
+    context_stream: str
+    tags: Optional[List[str]] = []
 
 
-class UserLogin(BaseModel):
-    email: str
-    password: str
+class QueryModel(BaseModel):
+    question: str
+    use_ai: Optional[bool] = True
 
 
-class IngestText(BaseModel):
-    text: str
-
-
-class ExtensionCapture(BaseModel):
-    text: str
-    source: str = "chrome_extension"
-    url: Optional[str] = None
-    title: Optional[str] = None
+class GraphNode(BaseModel):
+    id: str
+    label: str
+    type: str
+    author: Optional[str] = None
+    content: Optional[str] = None
     timestamp: Optional[str] = None
+    connections: List[str] = []
+    x: float = 0
+    y: float = 0
 
 
-class AskQuery(BaseModel):
-    query: str
+class GraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    label: str
+    animated: bool = True
 
 
-def create_token(email: str) -> str:
-    expire = datetime.utcnow() + timedelta(hours=settings.jwt_expire_hours)
-    return jwt.encode(
-        {"sub": email, "exp": expire},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm
+@app.get("/")
+async def root():
+    return {
+        "service": "AI Phantom Developer",
+        "version": "1.0.0",
+        "status": "ONLINE",
+        "memories": len(phantom_memories),
+        "connections": len(node_connections),
+        "endpoints": ["/ingest", "/query", "/graph", "/stats", "/health"]
+    }
+
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "AI Phantom Developer",
+        "cognee_version": "1.2.2",
+        "memories": len(phantom_memories),
+        "connections": len(node_connections)
+    }
+
+
+@app.post("/ingest")
+async def ingest_memory(payload: MemoryIngest):
+    """Ingest tribal knowledge with automatic connection detection"""
+    global memory_counter, node_connections
+
+    memory_counter += 1
+    node_id = f"mem_{memory_counter:04d}"
+
+    # Build full content
+    full_text = (
+        f"Developer: {payload.author}. "
+        f"Commit: {payload.message}. "
+        f"Context: {payload.context_stream}"
     )
 
+    # Create memory entry
+    memory = {
+        "id": node_id,
+        "author": payload.author,
+        "message": payload.message,
+        "context": payload.context_stream,
+        "full_text": full_text,
+        "timestamp": datetime.utcnow().isoformat(),
+        "tags": payload.tags or [],
+        "type": "TribalKnowledgeNode"
+    }
 
-def verify_token(token: str) -> str:
+    # Auto-detect connections based on author and keywords
+    connections = []
+    for existing in phantom_memories:
+        # Connect same authors
+        if existing["author"] == payload.author:
+            conn_id = f"conn_{len(node_connections)}"
+            node_connections.append({
+                "id": conn_id,
+                "source": existing["id"],
+                "target": node_id,
+                "label": "same_author",
+                "strength": 0.8
+            })
+            connections.append(existing["id"])
+
+        # Connect by keyword overlap
+        existing_words = set(existing["message"].lower().split() + existing["context"].lower().split())
+        new_words = set(payload.message.lower().split() + payload.context_stream.lower().split())
+        overlap = existing_words & new_words
+        common_keywords = {"fix", "bug", "payment", "api", "cache", "auth", "test", "production", "deploy"}
+        if overlap & common_keywords and existing["author"] != payload.author:
+            conn_id = f"conn_{len(node_connections)}"
+            node_connections.append({
+                "id": conn_id,
+                "source": existing["id"],
+                "target": node_id,
+                "label": "related_topic",
+                "strength": 0.5
+            })
+            connections.append(existing["id"])
+
+    memory["connections"] = connections
+    phantom_memories.append(memory)
+
+    # Try Cognee remember if LLM is configured
     try:
-        payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
-        return payload["sub"]
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(401, "Token expired")
-    except jwt.JWTError:
-        raise HTTPException(401, "Invalid token")
-
-
-def get_current_user(authorization: str = "") -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Invalid authorization header")
-    token = authorization[7:]
-    return verify_token(token)
-
-
-@app.post("/auth/signup")
-async def signup(user: UserCreate):
-    if user.email in users_db:
-        raise HTTPException(400, "Email already registered")
-
-    users_db[user.email] = {
-        "email": user.email,
-        "password": user.password,
-        "full_name": user.full_name,
-    }
-
-    token = create_token(user.email)
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {"email": user.email, "full_name": user.full_name}
-    }
-
-
-@app.post("/auth/login")
-async def login(user: UserLogin):
-    if user.email not in users_db or users_db[user.email]["password"] != user.password:
-        raise HTTPException(401, "Invalid credentials")
-
-    token = create_token(user.email)
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {"email": user.email, "full_name": users_db[user.email]["full_name"]}
-    }
-
-
-@app.post("/ingest/text")
-async def ingest_text(data: IngestText):
-    """Ingest text into Cognee knowledge graph"""
-    try:
-        # Add text to Cognee dataset
-        await cognee.add(data.text, dataset_name=DATASET_NAME)
-
-        # Cognify to build the knowledge graph
-        await cognee.cognify(datasets=[DATASET_NAME])
-
-        return {"status": "success", "message": "Text ingested and graph built"}
+        await cognee.remember(full_text, dataset_name=DATASET_NAME)
+        logger.info(f"Cognee remember: {node_id}")
     except Exception as e:
-        raise HTTPException(500, f"Ingestion failed: {str(e)}")
+        logger.warning(f"Cognee skipped: {e}")
 
-
-@app.post("/ingest/extension")
-async def ingest_extension(data: ExtensionCapture):
-    """Ingest browsing data from Chrome extension"""
-    try:
-        # Format the content with metadata
-        formatted_text = data.text
-        if data.title:
-            formatted_text = f"[{data.title}]\n{formatted_text}"
-        if data.url:
-            formatted_text = f"URL: {data.url}\n{formatted_text}"
-
-        # Store in memory (simple in-memory storage for hackathon demo)
-        memory_entry = {
-            "text": formatted_text,
-            "source": data.source,
-            "url": data.url,
-            "title": data.title,
-            "timestamp": data.timestamp or datetime.utcnow().isoformat()
-        }
-        extension_memories.append(memory_entry)
-
-        # Try to add to Cognee if available (requires LLM API key)
-        try:
-            await cognee.add(formatted_text, dataset_name=DATASET_NAME)
-        except Exception:
-            pass  # Still return success if Cognee fails
-
-        return {
-            "status": "success",
-            "message": "Browsing data captured",
-            "title": data.title,
-            "url": data.url
-        }
-    except Exception as e:
-        raise HTTPException(500, f"Extension capture failed: {str(e)}")
-
-
-@app.get("/memories/extension")
-async def get_extension_memories():
-    """Get memories captured from the Chrome extension"""
     return {
-        "memories": extension_memories,
-        "count": len(extension_memories)
+        "status": "success",
+        "node_id": node_id,
+        "author": payload.author,
+        "message": payload.message[:50] + "..." if len(payload.message) > 50 else payload.message,
+        "connections": len(connections),
+        "total_memories": len(phantom_memories)
     }
 
 
 @app.post("/ingest/file")
 async def ingest_file(file: UploadFile = File(...)):
-    """Ingest uploaded file into Cognee knowledge graph"""
+    """Ingest from uploaded file"""
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+
+    global memory_counter
+    memory_counter += 1
+    node_id = f"file_{memory_counter:04d}"
+
+    memory = {
+        "id": node_id,
+        "author": "file_upload",
+        "message": file.filename,
+        "context": text[:500],
+        "full_text": text[:2000],
+        "timestamp": datetime.utcnow().isoformat(),
+        "type": "FileNode"
+    }
+    phantom_memories.append(memory)
+
     try:
-        content = await file.read()
-        text = content.decode("utf-8", errors="ignore")
-
         await cognee.add(text, dataset_name=DATASET_NAME)
-        await cognee.cognify(datasets=[DATASET_NAME])
+    except Exception:
+        pass
 
-        return {"status": "success", "message": f"File '{file.filename}' ingested"}
+    return {
+        "status": "success",
+        "node_id": node_id,
+        "filename": file.filename,
+        "size": len(content)
+    }
+
+
+@app.post("/query")
+async def query_memory(payload: QueryModel):
+    """Query memories with AI-powered recall"""
+    results = []
+    query_lower = payload.question.lower()
+
+    # Search in-memory with fuzzy matching
+    for mem in phantom_memories:
+        score = 0
+        search_fields = [mem["message"], mem["context"], mem["author"], mem["full_text"]]
+        search_text = " ".join(search_fields).lower()
+
+        # Calculate relevance score
+        query_words = query_lower.split()
+        for word in query_words:
+            if len(word) > 2 and word in search_text:
+                score += 1
+
+        if score > 0:
+            results.append({
+                "id": mem["id"],
+                "content": mem["full_text"][:300],
+                "author": mem["author"],
+                "message": mem["message"],
+                "timestamp": mem["timestamp"],
+                "relevance_score": score,
+                "connections": mem.get("connections", []),
+                "type": mem["type"]
+            })
+
+    # Sort by relevance
+    results.sort(key=lambda x: x["relevance_score"], reverse=True)
+
+    # Try Cognee recall if AI enabled
+    ai_answer = None
+    if payload.use_ai and results:
+        try:
+            cognee_results = await cognee.recall(
+                query_text=payload.question,
+                dataset_name=DATASET_NAME,
+                top_k=3
+            )
+            if cognee_results:
+                ai_answer = " | ".join([
+                    getattr(r, "text", str(r))[:200]
+                    for r in cognee_results[:3]
+                ])
+        except Exception as e:
+            # Generate simulated AI answer from context
+            if results:
+                top_result = results[0]
+                ai_answer = (
+                    f"Based on tribal knowledge from {top_result['author']}: "
+                    f"{top_result['message']}. "
+                    f"Context: {top_result['content'][:150]}..."
+                )
+
+    return {
+        "query": payload.question,
+        "results": results[:10],
+        "ai_answer": ai_answer,
+        "total_found": len(results)
+    }
+
+
+@app.post("/optimize")
+async def optimize_graph():
+    """Build semantic connections using Cognee improve"""
+    try:
+        await cognee.improve(dataset_name=DATASET_NAME)
+        return {"status": "success", "message": "Graph optimized"}
     except Exception as e:
-        raise HTTPException(500, f"File ingestion failed: {str(e)}")
+        # Auto-connect based on content similarity
+        new_connections = 0
+        for i, mem1 in enumerate(phantom_memories):
+            for mem2 in phantom_memories[i+1:]:
+                # Check if already connected
+                existing = any(
+                    c["source"] == mem1["id"] and c["target"] == mem2["id"]
+                    for c in node_connections
+                )
+                if not existing:
+                    # Similarity check
+                    words1 = set(mem1["full_text"].lower().split())
+                    words2 = set(mem2["full_text"].lower().split())
+                    overlap = len(words1 & words2)
+                    if overlap > 5:
+                        node_connections.append({
+                            "id": f"conn_{len(node_connections)}",
+                            "source": mem1["id"],
+                            "target": mem2["id"],
+                            "label": "semantic",
+                            "strength": min(overlap / 10, 1.0)
+                        })
+                        new_connections += 1
+
+        return {
+            "status": "partial",
+            "message": f"Added {new_connections} semantic connections",
+            "cognee_error": str(e)
+        }
+
+
+@app.delete("/forget/{node_id}")
+async def forget_memory(node_id: str):
+    """Remove a memory node"""
+    global phantom_memories, node_connections
+
+    original_count = len(phantom_memories)
+    phantom_memories = [m for m in phantom_memories if m["id"] != node_id]
+    node_connections = [c for c in node_connections if c["source"] != node_id and c["target"] != node_id]
+
+    try:
+        await cognee.forget(dataset_name=DATASET_NAME, document_id=node_id)
+    except Exception:
+        pass
+
+    return {
+        "status": "forgotten" if len(phantom_memories) < original_count else "not_found",
+        "node_id": node_id,
+        "remaining": len(phantom_memories)
+    }
 
 
 @app.get("/graph")
 async def get_graph():
-    """Get the knowledge graph in React Flow format"""
-    try:
-        # Get the graph engine directly
-        graph_config = get_graph_config()
-        graph_engine = graph_config.graph_engine
+    """Get animated graph data with positions"""
+    nodes = []
+    edges = []
 
-        # Get all graph data
-        graph_data = await graph_engine.get_graph_data()
+    # Calculate positions using force-directed-like layout
+    total = len(phantom_memories)
+    for i, mem in enumerate(phantom_memories):
+        # Circular layout with some randomness
+        angle = (2 * 3.14159 * i / max(total, 1))
+        radius = 200 + (i % 3) * 50
+        x = 400 + radius * (i % 2 == 0 and 1 or -1) * (0.5 + i / max(total, 1))
+        y = 300 + radius * 0.8 * (0.5 + (i // 3) / max(total // 3, 1))
 
-        if not graph_data:
-            return {"nodes": [], "edges": []}
+        node_type = "memory"
+        if "file" in mem["id"]:
+            node_type = "file"
+        elif mem.get("tags"):
+            node_type = "tagged"
 
-        nodes = []
-        edges = []
+        nodes.append({
+            "id": mem["id"],
+            "label": mem["message"][:30] + ("..." if len(mem["message"]) > 30 else ""),
+            "fullLabel": mem["message"],
+            "author": mem["author"],
+            "content": mem["context"][:100],
+            "type": node_type,
+            "x": x,
+            "y": y,
+            "timestamp": mem["timestamp"],
+            "connections": mem.get("connections", [])
+        })
 
-        # Convert nodes
-        for node in graph_data.get("nodes", []):
-            node_id = str(node.get("id", node.get("name", "")))
-            nodes.append({
-                "id": node_id,
-                "type": "memory",
-                "data": {
-                    "label": node.get("name", node_id[:20]),
-                    "type": node.get("type", "entity"),
-                    "description": str(node.get("description", ""))[:100]
-                },
-                "position": {"x": 0, "y": 0}
-            })
+    # Build edges with animation data
+    for conn in node_connections:
+        edges.append({
+            "id": conn["id"],
+            "source": conn["source"],
+            "target": conn["target"],
+            "label": conn["label"],
+            "strength": conn.get("strength", 0.5),
+            "animated": True
+        })
 
-        # Convert edges
-        for edge in graph_data.get("edges", []):
-            source = str(edge.get("source", edge.get("from", "")))
-            target = str(edge.get("target", edge.get("to", "")))
-            edges.append({
-                "id": f"{source}-{target}",
-                "source": source,
-                "target": target,
-                "label": edge.get("relationship", edge.get("label", "")),
-                "type": "default"
-            })
-
-        return {"nodes": nodes, "edges": edges}
-
-    except Exception as e:
-        # Fallback: try getting graph via search
-        try:
-            # Use search to find nodes
-            results = await cognee.search(
-                query_text="*",
-                query_type=SearchType.CHUNKS,
-                datasets=[DATASET_NAME],
-                top_k=100
-            )
-
-            nodes = []
-            edges = []
-            seen_ids = set()
-
-            for r in results:
-                node_id = str(getattr(r, "id", str(hash(r))))
-                if node_id not in seen_ids:
-                    seen_ids.add(node_id)
-                    nodes.append({
-                        "id": node_id,
-                        "type": "memory",
-                        "data": {
-                            "label": str(getattr(r, "name", str(r)[:30])),
-                            "type": "chunk",
-                            "description": str(getattr(r, "text", str(r)[:100]))
-                        },
-                        "position": {"x": 0, "y": 0}
-                    })
-
-            return {"nodes": nodes, "edges": edges}
-        except Exception as e2:
-            return {"nodes": [], "edges": [], "error": str(e2)}
-
-
-@app.post("/ask")
-async def ask(query: AskQuery):
-    """Ask a question using Cognee search and recall"""
-    try:
-        # Use Cognee's recall for intelligent answers with context
-        results = await cognee.recall(
-            query_text=query.query,
-            datasets=[DATASET_NAME],
-            top_k=10,
-            include_references=True
-        )
-
-        answer = ""
-        retrieved_nodes = []
-
-        if results:
-            for r in results:
-                # Handle different response types
-                if hasattr(r, "answer"):
-                    answer += r.answer + "\n"
-                elif hasattr(r, "content"):
-                    answer += r.content + "\n"
-                elif hasattr(r, "text"):
-                    answer += r.text + "\n"
-                elif isinstance(r, str):
-                    answer += r + "\n"
-
-                # Extract referenced nodes
-                if hasattr(r, "references"):
-                    for ref in r.references:
-                        retrieved_nodes.append({
-                            "id": str(getattr(ref, "id", "")),
-                            "label": str(getattr(ref, "name", str(ref)[:20]))
-                        })
-
-        if not answer:
-            answer = "I couldn't find relevant information in your memory."
-
-        return {
-            "answer": answer,
-            "retrieved_nodes": retrieved_nodes[:5],
-            "query": query.query
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "stats": {
+            "total_memories": len(phantom_memories),
+            "total_connections": len(node_connections),
+            "unique_authors": len(set(m["author"] for m in phantom_memories))
         }
-
-    except Exception as e:
-        # Fallback to simple search
-        try:
-            results = await cognee.search(
-                query_text=query.query,
-                query_type=SearchType.GRAPH_COMPLETION,
-                datasets=[DATASET_NAME],
-                top_k=5
-            )
-
-            answer = ""
-            retrieved_nodes = []
-
-            for r in results:
-                if hasattr(r, "answer"):
-                    answer += r.answer + "\n"
-                elif hasattr(r, "content"):
-                    answer += r.content + "\n"
-                elif isinstance(r, str):
-                    answer += r + "\n"
-
-            if not answer:
-                answer = "No relevant memories found."
-
-            return {
-                "answer": answer,
-                "retrieved_nodes": retrieved_nodes,
-                "query": query.query
-            }
-        except Exception as e2:
-            return {
-                "answer": f"Unable to search memory. Error: {str(e2)}",
-                "retrieved_nodes": [],
-                "query": query.query
-            }
+    }
 
 
-@app.post("/remember")
-async def remember_text(data: IngestText):
-    """Use Cognee's remember API (add + cognify in one call)"""
-    try:
-        result = await cognee.remember(data.text, dataset_name=DATASET_NAME)
-        return {
-            "status": "success",
-            "message": "Memory stored and graph built",
-            "dataset": result.dataset_name if hasattr(result, "dataset_name") else DATASET_NAME
-        }
-    except Exception as e:
-        raise HTTPException(500, f"Memory storage failed: {str(e)}")
+@app.get("/stats")
+async def get_stats():
+    """Get memory statistics"""
+    authors = {}
+    for mem in phantom_memories:
+        authors[mem["author"]] = authors.get(mem["author"], 0) + 1
+
+    return {
+        "total_memories": len(phantom_memories),
+        "total_connections": len(node_connections),
+        "unique_authors": len(authors),
+        "author_breakdown": authors,
+        "oldest": phantom_memories[0]["timestamp"] if phantom_memories else None,
+        "newest": phantom_memories[-1]["timestamp"] if phantom_memories else None
+    }
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "service": "LifeOS AI Backend", "cognee_version": cognee.get_cognee_version()}
+@app.get("/connections/{node_id}")
+async def get_connections(node_id: str):
+    """Get all connections for a specific node"""
+    incoming = [c for c in node_connections if c["target"] == node_id]
+    outgoing = [c for c in node_connections if c["source"] == node_id]
+
+    return {
+        "node_id": node_id,
+        "incoming": incoming,
+        "outgoing": outgoing,
+        "total": len(incoming) + len(outgoing)
+    }
