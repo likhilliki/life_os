@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Brain, LayoutDashboard, Network, Calendar, Target, BookOpen,
   MessageSquare, Upload, Settings, BarChart3, Bell, Search, Menu,
-  LogOut, Moon, Sun, ChevronLeft, Sparkles,
+  LogOut, Moon, Sun, ChevronLeft, Sparkles, Gauge, Bug,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth';
@@ -31,6 +31,8 @@ const navItems = [
   { icon: Target, label: 'Goals', href: '/goals' },
   { icon: BookOpen, label: 'Decisions', href: '/decisions' },
   { icon: MessageSquare, label: 'AI Chat', href: '/chat' },
+  { icon: Gauge, label: 'Evaluation', href: '/evaluation' },
+  { icon: Bug, label: 'Pipeline Debug', href: '/pipeline' },
   { icon: Upload, label: 'Add Memory', href: '/upload' },
   { icon: BarChart3, label: 'Analytics', href: '/analytics' },
 ];

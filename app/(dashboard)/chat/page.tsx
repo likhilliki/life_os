@@ -9,24 +9,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/auth';
-import { supabase } from '@/lib/supabase';
-
-interface Source {
-  id: string;
-  title: string;
-  type: string;
-  tags: string[];
-  created_at: string;
-}
+import { queryRag } from '@/lib/rag/client';
+import type { SourceRef } from '@/lib/rag/types';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  sources?: Source[];
+  sources?: SourceRef[];
   confidence?: number;
   grounded?: boolean;
+  refused?: boolean;
+  clarification?: string | null;
   isTyping?: boolean;
 }
 
@@ -61,7 +56,15 @@ export default function ChatPage() {
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  const animateTyping = (messageId: string, fullText: string, sources?: Source[], confidence?: number, grounded?: boolean) => {
+  const animateTyping = (
+    messageId: string,
+    fullText: string,
+    sources?: SourceRef[],
+    confidence?: number,
+    grounded?: boolean,
+    refused?: boolean,
+    clarification?: string | null
+  ) => {
     let i = 0;
     const chunkSize = Math.max(2, Math.ceil(fullText.length / 80));
     if (typingTimerRef.current) clearInterval(typingTimerRef.current);
@@ -73,7 +76,7 @@ export default function ChatPage() {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === messageId
-              ? { ...m, content: fullText, isTyping: false, sources, confidence, grounded }
+              ? { ...m, content: fullText, isTyping: false, sources, confidence, grounded, refused, clarification }
               : m
           )
         );
@@ -111,50 +114,21 @@ export default function ChatPage() {
     }]);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-
-      if (!accessToken) {
-        animateTyping(assistantId, 'Your session expired. Please sign in again to use the chat.');
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/rag-chat`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          },
-          body: JSON.stringify({
-            question: queryText,
-            history: messages
-              .filter((m) => !m.isTyping)
-              .slice(-6)
-              .map((m) => ({ role: m.role, content: m.content })),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        throw new Error(errBody.error || `Request failed (${response.status})`);
-      }
-
-      const data = await response.json();
-      if (!data || typeof data.answer !== 'string') {
-        throw new Error('Unexpected response from the server.');
-      }
+      const data = await queryRag(queryText, {
+        history: messages
+          .filter((m) => !m.isTyping)
+          .slice(-6)
+          .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      });
 
       animateTyping(
         assistantId,
         data.answer,
         data.sources,
         data.confidence,
-        data.grounded
+        data.grounded,
+        data.refused,
+        data.clarification_question
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong.';
@@ -175,7 +149,7 @@ export default function ChatPage() {
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <MessageSquare className="w-8 h-8 text-primary" />AI Chat
           </h1>
-          <p className="text-muted-foreground">Ask about your memories — answers are grounded in your saved data</p>
+          <p className="text-muted-foreground">Ask about your memories - answers are grounded in your saved data</p>
         </div>
         <Button
           variant="outline"
@@ -256,7 +230,13 @@ export default function ChatPage() {
                         </Card>
 
                         {msg.role === 'assistant' && !msg.isTyping && msg.sources && msg.sources.length > 0 && (
-                          <SourceList sources={msg.sources} confidence={msg.confidence} grounded={msg.grounded} />
+                          <SourceList
+                            sources={msg.sources}
+                            confidence={msg.confidence}
+                            grounded={msg.grounded}
+                            refused={msg.refused}
+                            clarification={msg.clarification}
+                          />
                         )}
                       </div>
                     </div>
@@ -306,7 +286,15 @@ export default function ChatPage() {
   );
 }
 
-function SourceList({ sources, confidence, grounded }: { sources: Source[]; confidence?: number; grounded?: boolean }) {
+function SourceList({
+  sources, confidence, grounded, refused, clarification,
+}: {
+  sources: SourceRef[];
+  confidence?: number;
+  grounded?: boolean;
+  refused?: boolean;
+  clarification?: string | null;
+}) {
   const [expanded, setExpanded] = useState(false);
   return (
     <motion.div
@@ -316,12 +304,17 @@ function SourceList({ sources, confidence, grounded }: { sources: Source[]; conf
       className="mt-2 ml-1"
     >
       <div className="flex items-center gap-2 flex-wrap mb-2">
-        {grounded === true && (
+        {refused && (
+          <Badge variant="outline" className="gap-1 text-amber-500 border-amber-500/30 bg-amber-500/10">
+            <AlertCircle className="w-3 h-3" /> Refused - insufficient evidence
+          </Badge>
+        )}
+        {grounded === true && !refused && (
           <Badge variant="outline" className="gap-1 text-emerald-500 border-emerald-500/30 bg-emerald-500/10">
             <CheckCircle2 className="w-3 h-3" /> Verified
           </Badge>
         )}
-        {grounded === false && (
+        {grounded === false && !refused && (
           <Badge variant="outline" className="gap-1 text-amber-500 border-amber-500/30 bg-amber-500/10">
             <AlertCircle className="w-3 h-3" /> Low grounding
           </Badge>
@@ -339,6 +332,12 @@ function SourceList({ sources, confidence, grounded }: { sources: Source[]; conf
           <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
+
+      {clarification && (
+        <div className="mb-2 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-blue-400">
+          {clarification}
+        </div>
+      )}
 
       <AnimatePresence>
         {expanded && (
